@@ -1,0 +1,55 @@
+{
+  "title": "DRIP Season 1 — Post-Incentive Retention Analysis",
+  "description": "Arbitrum DAO DRIP Season 1 deployed 14.6M ARB across 6 lending protocols (Sep 2025 – Feb 2026) to incentivize leverage looping. This dashboard measures whether that growth was durable or temporary.",
+  "start_date": "2025-09-03",
+  "end_date": "2026-02-01",
+  "total_arb": 14600000,
+  "dune_api_key": "TFc1UByfvfm3IHaMWr7Q5oXxav63gBAU",
+  "cohort_query_id": 7829745,
+  "protocols": [
+    {
+      "name": "Morpho",
+      "slug": "morpho-blue",
+      "chain": "Arbitrum",
+      "dune_query_id": 7827417
+    },
+    {
+      "name": "Aave V3",
+      "slug": "aave-v3",
+      "chain": "Arbitrum",
+      "dune_query_id": 7827418
+    },
+    {
+      "name": "Fluid",
+      "slug": "fluid",
+      "chain": "Arbitrum",
+      "dune_query_id": 7827419
+    },
+    {
+      "name": "Euler",
+      "slug": "euler-v2",
+      "chain": "Arbitrum",
+      "dune_query_id": 7827420
+    },
+    {
+      "name": "Dolomite",
+      "slug": "dolomite",
+      "chain": "Arbitrum",
+      "dune_query_id": 7827447
+    },
+    {
+      "name": "Silo",
+      "slug": "silo-finance",
+      "chain": "Arbitrum",
+      "dune_query_id": 7827665
+    }
+  ],
+  "cohort_wallet_queries": {
+    "Morpho": 7834305,
+    "Fluid": 7834306,
+    "Euler": 7834307,
+    "Dolomite": 7834325,
+    "Silo": 7834329,
+    "Aave V3": 7834340
+  }
+}
