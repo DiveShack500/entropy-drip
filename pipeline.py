@@ -279,9 +279,11 @@ body{{font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif
   background:transparent;color:#111827;padding:2rem;line-height:1.6;min-height:100vh}}
 body::before{{
   content:'';position:fixed;inset:0;z-index:-1;
-  background-color:#f4f6f9;
-  background-image:radial-gradient(circle,#c8cdd6 1px,transparent 1px);
-  background-size:24px 24px}}
+  background:linear-gradient(rgba(71,85,105,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(71,85,105,.05) 1px,transparent 1px),linear-gradient(135deg,#f9fafb,#f1f5f9,#e2e8f0,#f1f5f9,#f9fafb);
+  background-size:20px 20px,20px 20px,400% 400%;
+  background-position:0 0,0 0,0% 50%;
+  animation:gradientShift 15s ease infinite}}
+@keyframes gradientShift{{0%{{background-position:0 0,0 0,0% 50%}}50%{{background-position:0 0,0 0,100% 50%}}100%{{background-position:0 0,0 0,0% 50%}}}}
 a{{color:#1d4ed8}}
 h1{{font-size:1.6rem;font-weight:700;color:#111827;letter-spacing:-.01em}}
 h2{{font-size:.8rem;font-weight:700;color:#374151;margin:2rem 0 .75rem;
@@ -522,7 +524,7 @@ function computeMetrics(series) {{
   return {{ baseline, preTVL, peak, current, retentionVsPre, growth: baseline > 0 ? peak/baseline : 0 }};
 }}
 
-function windowAnnotation(dates) {{
+function windowAnnotation(dates, extra) {{
   const si = dates.findIndex(d => d >= CONFIG.start_date);
   const ei = dates.findIndex(d => d > CONFIG.end_date) - 1;
   const ai = dates.findIndex(d => d >= '2025-04-16');
@@ -548,6 +550,7 @@ function windowAnnotation(dates) {{
     }};
   }}
 
+  if (extra) Object.assign(annotations, extra(dates));
   return annotations;
 }}
 
@@ -562,9 +565,9 @@ function baseOpts(dates, annotations) {{
     }},
     scales:{{
       x:{{ ticks:{{color:'#9ca3af',maxTicksLimit:8,font:{{size:10}}}},
-           grid:{{display:true,color:'#f3f4f6',lineWidth:1}} }},
+           grid:{{display:true,color:'rgba(255,255,255,0.06)',lineWidth:1}} }},
       y:{{ ticks:{{color:'#9ca3af',callback:v=>`$${{v}}M`,font:{{size:10}},maxTicksLimit:50}},
-           grid:{{display:true,color:'#f3f4f6',lineWidth:1}} }}
+           grid:{{display:true,color:'rgba(255,255,255,0.06)',lineWidth:1}} }}
     }}
   }};
 }}
@@ -721,11 +724,20 @@ function render(protocols) {{
       const tvls  = p.series.map(d=>+(d.tvl/1e6).toFixed(3));
 
       const canvas = document.getElementById(id);
+      const morphoExtra = p.name === 'Morpho' ? (ds => {{
+        const li = ds.findIndex(d => d >= '2025-08-12');
+        if (li < 0) return {{}};
+        return {{ morphoLaunch: {{ type:'line', xMin:li, xMax:li,
+          borderColor:'rgba(52,211,153,0.8)', borderWidth:1.5, borderDash:[5,4],
+          label:{{ display:true, content:'Launched', color:'#34d399', position:'end',
+                   font:{{size:9}}, backgroundColor:'rgba(15,23,42,0.85)', padding:{{x:4,y:2}} }}
+        }} }};
+      }}) : null;
       lazyChart(canvas, () => {{
         protocolCharts[i] = new Chart(canvas, {{
           type:'line',
           data:{{ labels:dates, datasets:buildDatasets(p.color, tvls) }},
-          options: baseOpts(dates, windowAnnotation(dates))
+          options: baseOpts(dates, windowAnnotation(dates, morphoExtra))
         }});
       }});
     }});
@@ -738,7 +750,16 @@ function render(protocols) {{
 
 // ── wallet charts ─────────────────────────────────────────────────────────────
 function walletChartOpts(dates, protocolName) {{
-  const opts = baseOpts(dates, windowAnnotation(dates));
+  const morphoExtra = protocolName === 'Morpho' ? (ds => {{
+    const li = ds.findIndex(d => d >= '2025-08-12');
+    if (li < 0) return {{}};
+    return {{ morphoLaunch: {{ type:'line', xMin:li, xMax:li,
+      borderColor:'rgba(52,211,153,0.8)', borderWidth:1.5, borderDash:[5,4],
+      label:{{ display:true, content:'Launched', color:'#34d399', position:'end',
+               font:{{size:9}}, backgroundColor:'rgba(15,23,42,0.85)', padding:{{x:4,y:2}} }}
+    }} }};
+  }}) : null;
+  const opts = baseOpts(dates, windowAnnotation(dates, morphoExtra));
   opts.scales.y.ticks.callback = v => v >= 1000 ? `${{(v/1000).toFixed(1)}}k` : v;
   opts.plugins.tooltip.enabled = true;
   opts.interaction = {{ mode:'index', intersect:false }};
@@ -748,7 +769,7 @@ function walletChartOpts(dates, protocolName) {{
 function openWalletModal(name, series, color) {{
   currentModalIdx = -1;
   document.getElementById('modal-title').textContent = name + ' — Unique Daily Active Wallets (Arbitrum)';
-  document.getElementById('modal').style.display = 'block';
+  document.getElementById('modal').style.display = 'block'; document.body.style.overflow = 'hidden';
 
   const vals   = series.map(d => d.wallets);
   const dates  = series.map(d => d.date);
@@ -1054,7 +1075,7 @@ function renderCohort() {{
     }}
   }});
 
-  const bar = (pct, color) => `<div style="width:100%;background:rgba(255,255,255,0.07);border-radius:3px;height:12px;overflow:hidden"><div style="width:${{Math.min(pct,100)}}%;height:100%;background:${{color}};border-radius:3px"></div></div>`;
+  const bar = (pct, color) => `<div style="display:flex;align-items:center;gap:.5rem"><div style="flex:1;background:rgba(255,255,255,0.07);border-radius:3px;height:12px;overflow:hidden"><div style="width:${{Math.min(pct,100)}}%;height:100%;background:${{color}};border-radius:3px"></div></div><span style="font-size:.75rem;color:${{color}};min-width:3.5rem;text-align:right;font-variant-numeric:tabular-nums">${{pct.toFixed(1)}}%</span></div>`;
   const anchor = g1 || g2;
   const rows = anchor.checkpoints.map((_, i) => {{
     const fmt = (g) => {{
@@ -1089,7 +1110,7 @@ function openModal(i) {{
   const m = p.metrics;
 
   document.getElementById('modal-title').textContent = p.name + ' — TVL History (Arbitrum)';
-  document.getElementById('modal').style.display = 'block';
+  document.getElementById('modal').style.display = 'block'; document.body.style.overflow = 'hidden';
 
   const preColor = retentionColor(m.retentionVsPre);
   const decay    = decayResults[p.name];
@@ -1132,6 +1153,7 @@ function openModal(i) {{
 
 function closeModal() {{
   document.getElementById('modal').style.display = 'none';
+  document.body.style.overflow = '';
   if (modalChart) {{ modalChart.destroy(); modalChart = null; }}
   currentModalIdx = -1;
 }}
