@@ -729,7 +729,7 @@ function render(protocols) {{
         if (li < 0) return {{}};
         return {{ fluidEvent: {{ type:'line', xMin:li, xMax:li,
           borderColor:'rgba(251,191,36,0.8)', borderWidth:1.5, borderDash:[5,4],
-          label:{{ display:true, content:'May 27', color:'#fbbf24', position:'end',
+          label:{{ display:true, content:'May 27 Exploit', color:'#fbbf24', position:'end',
                    font:{{size:9}}, backgroundColor:'rgba(15,23,42,0.85)', padding:{{x:4,y:2}} }}
         }} }};
       }}) : null;
@@ -755,7 +755,7 @@ function walletChartOpts(dates, protocolName) {{
     if (li < 0) return {{}};
     return {{ fluidEvent: {{ type:'line', xMin:li, xMax:li,
       borderColor:'rgba(251,191,36,0.8)', borderWidth:1.5, borderDash:[5,4],
-      label:{{ display:true, content:'May 27', color:'#fbbf24', position:'end',
+      label:{{ display:true, content:'May 27 Exploit', color:'#fbbf24', position:'end',
                font:{{size:9}}, backgroundColor:'rgba(15,23,42,0.85)', padding:{{x:4,y:2}} }}
     }} }};
   }}) : null;
