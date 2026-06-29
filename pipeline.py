@@ -724,12 +724,12 @@ function render(protocols) {{
       const tvls  = p.series.map(d=>+(d.tvl/1e6).toFixed(3));
 
       const canvas = document.getElementById(id);
-      const morphoExtra = p.name === 'Morpho' ? (ds => {{
-        const li = ds.findIndex(d => d >= '2025-08-12');
+      const protocolExtra = p.name === 'Fluid' ? (ds => {{
+        const li = ds.findIndex(d => d >= '2026-05-27');
         if (li < 0) return {{}};
-        return {{ morphoLaunch: {{ type:'line', xMin:li, xMax:li,
-          borderColor:'rgba(52,211,153,0.8)', borderWidth:1.5, borderDash:[5,4],
-          label:{{ display:true, content:'Launched', color:'#34d399', position:'end',
+        return {{ fluidEvent: {{ type:'line', xMin:li, xMax:li,
+          borderColor:'rgba(251,191,36,0.8)', borderWidth:1.5, borderDash:[5,4],
+          label:{{ display:true, content:'May 27', color:'#fbbf24', position:'end',
                    font:{{size:9}}, backgroundColor:'rgba(15,23,42,0.85)', padding:{{x:4,y:2}} }}
         }} }};
       }}) : null;
@@ -737,7 +737,7 @@ function render(protocols) {{
         protocolCharts[i] = new Chart(canvas, {{
           type:'line',
           data:{{ labels:dates, datasets:buildDatasets(p.color, tvls) }},
-          options: baseOpts(dates, windowAnnotation(dates, morphoExtra))
+          options: baseOpts(dates, windowAnnotation(dates, protocolExtra))
         }});
       }});
     }});
@@ -750,16 +750,16 @@ function render(protocols) {{
 
 // ── wallet charts ─────────────────────────────────────────────────────────────
 function walletChartOpts(dates, protocolName) {{
-  const morphoExtra = protocolName === 'Morpho' ? (ds => {{
-    const li = ds.findIndex(d => d >= '2025-08-12');
+  const protocolExtra = protocolName === 'Fluid' ? (ds => {{
+    const li = ds.findIndex(d => d >= '2026-05-27');
     if (li < 0) return {{}};
-    return {{ morphoLaunch: {{ type:'line', xMin:li, xMax:li,
-      borderColor:'rgba(52,211,153,0.8)', borderWidth:1.5, borderDash:[5,4],
-      label:{{ display:true, content:'Launched', color:'#34d399', position:'end',
+    return {{ fluidEvent: {{ type:'line', xMin:li, xMax:li,
+      borderColor:'rgba(251,191,36,0.8)', borderWidth:1.5, borderDash:[5,4],
+      label:{{ display:true, content:'May 27', color:'#fbbf24', position:'end',
                font:{{size:9}}, backgroundColor:'rgba(15,23,42,0.85)', padding:{{x:4,y:2}} }}
     }} }};
   }}) : null;
-  const opts = baseOpts(dates, windowAnnotation(dates, morphoExtra));
+  const opts = baseOpts(dates, windowAnnotation(dates, protocolExtra));
   opts.scales.y.ticks.callback = v => v >= 1000 ? `${{(v/1000).toFixed(1)}}k` : v;
   opts.plugins.tooltip.enabled = true;
   opts.interaction = {{ mode:'index', intersect:false }};
