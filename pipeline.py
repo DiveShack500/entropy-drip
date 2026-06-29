@@ -399,21 +399,6 @@ tr:hover td{{background:#f9fafb}}
     <h2 id="wallet-heading" style="display:none">Unique Daily Active Wallets &nbsp;<span style="font-weight:400;color:#475569;font-size:.8rem">(purple band = DRIP Season 1 window)</span></h2>
     <div class="grid" id="wallet-grid" style="display:none"></div>
 
-    <h2 id="decay-heading" style="display:none">Post-Incentive Decay Model &nbsp;<span style="font-weight:400;color:#475569;font-size:.8rem">fitted to TVL after Season 1 ended (Feb 2026 → today)</span></h2>
-    <p id="decay-subtitle" class="subtitle" style="display:none">Each protocol's TVL after incentives ended is fitted to an exponential decay curve <em>TVL(t) = A · e<sup>−λt</sup></em>. Half-life is the number of days for TVL to fall 50% from its post-Season 1 starting value. Dashed lines on charts above show the fitted curves.</p>
-    <div class="tbl-wrap glass" id="decay-rank-wrap" style="display:none">
-      <table>
-        <thead><tr>
-          <th>Rank</th><th>Protocol</th><th>Half-Life</th>
-          <th>Decay Rate λ</th><th>Verdict</th>
-        </tr></thead>
-        <tbody id="decay-tbody"></tbody>
-      </table>
-    </div>
-    <div class="agg-wrap glass" id="decay-norm-wrap" style="display:none">
-      <p style="font-size:.75rem;color:#64748b;margin-bottom:.75rem">TVL indexed to 100% at Season 1 end (Feb 1 2026) &nbsp;·&nbsp; solid = actual &nbsp;·&nbsp; dashed = fitted decay curve</p>
-      <canvas id="decay-norm-chart" height="80"></canvas>
-    </div>
   </div>
 
   <h2 id="cohort-heading" style="display:none">Cohort Retention — Post-Incentive Wallet Behaviour</h2>
@@ -476,10 +461,8 @@ const CUTOFF       = new Date('2025-03-01');
 
 let aggChart  = null;
 let modalChart = null;
-let decayNormChart = null;
 let protocolCharts = {{}};
 let allData = [];
-let decayResults = {{}};
 let showHoverZone = false;
 let currentModalIdx = -1;
 
@@ -638,10 +621,8 @@ function toggleZone() {{
 // ── render ───────────────────────────────────────────────────────────────────
 function destroyCharts() {{
   if (aggChart)       {{ aggChart.destroy();       aggChart       = null; }}
-  if (decayNormChart) {{ decayNormChart.destroy(); decayNormChart = null; }}
   Object.values(protocolCharts).forEach(c => c.destroy());
   protocolCharts = {{}};
-  decayResults   = {{}};
   pendingCharts.forEach((_, canvas) => chartObserver.unobserve(canvas));
   pendingCharts.clear();
   document.getElementById('grid').innerHTML = '';
@@ -680,9 +661,7 @@ function render(protocols) {{
     </tr>`;
   }}).join('');
 
-  // pre-compute decay (CPU only, no DOM/canvas)
-  decayResults = {{}};
-  protocols.forEach(p => {{ const d = fitDecay(p.series); if (d) decayResults[p.name] = d; }});
+
 
   // Show content — stats and table are visible before any chart is drawn
   document.getElementById('loading').style.display = 'none';
@@ -743,7 +722,7 @@ function render(protocols) {{
     }});
 
     try {{ renderWallets(protocols); }} catch(e) {{ console.error('renderWallets:', e); }}
-    try {{ renderDecay(protocols);  }} catch(e) {{ console.error('renderDecay:',  e); }}
+
     try {{ renderCohort();          }} catch(e) {{ console.error('renderCohort:',  e); }}
   }});
 }}
@@ -866,159 +845,6 @@ function renderWallets(protocols) {{
   }}
 }}
 
-// ── decay model ──────────────────────────────────────────────────────────────
-function fitDecay(series) {{
-  const postDRIP = series.filter(d => d.date > CONFIG.end_date);
-  if (postDRIP.length < 14) return null;
-  const t0  = new Date(CONFIG.end_date).getTime();
-  const pts = postDRIP
-    .map(d => ({{ t: (new Date(d.date).getTime() - t0) / 864e5, y: d.tvl }}))
-    .filter(p => p.y > 0);
-  if (pts.length < 14) return null;
-
-  const lnY     = pts.map(p => Math.log(p.y));
-  const n       = pts.length;
-  const sumT    = pts.reduce((s,p) => s + p.t, 0);
-  const sumLnY  = lnY.reduce((s,v) => s + v, 0);
-  const sumT2   = pts.reduce((s,p) => s + p.t*p.t, 0);
-  const sumTLnY = pts.reduce((s,p,i) => s + p.t*lnY[i], 0);
-  const denom   = n*sumT2 - sumT*sumT;
-  if (Math.abs(denom) < 1e-10) return null;
-
-  const b      = (n*sumTLnY - sumT*sumLnY) / denom;
-  const a      = (sumLnY - b*sumT) / n;
-  const lambda = -b;
-  const A      = Math.exp(a);
-  const halfLife = lambda > 0 ? Math.log(2)/lambda : null;
-
-  const meanLnY = sumLnY / n;
-  const ssTot   = lnY.reduce((s,v) => s + (v-meanLnY)**2, 0);
-  const ssRes   = pts.reduce((s,p,i) => s + (lnY[i] - (a+b*p.t))**2, 0);
-  const r2      = ssTot > 0 ? Math.max(0, 1 - ssRes/ssTot) : 0;
-
-  const fittedByDate = {{}};
-  postDRIP.forEach(d => {{
-    const t = (new Date(d.date).getTime() - t0) / 864e5;
-    fittedByDate[d.date] = A * Math.exp(-lambda * t);
-  }});
-  return {{ lambda, A, halfLife, r2, fittedByDate }};
-}}
-
-function halfLifeColor(hl) {{
-  if (hl === null || hl <= 0) return '#22c55e';
-  if (hl > 180) return '#22c55e';
-  if (hl > 90)  return '#84cc16';
-  if (hl > 45)  return '#eab308';
-  return '#ef4444';
-}}
-
-function halfLifeVerdict(hl) {{
-  if (hl === null || hl <= 0) return 'Growing ↑';
-  if (hl > 180) return 'Very sticky';
-  if (hl > 90)  return 'Sticky';
-  if (hl > 45)  return 'Moderate decay';
-  return 'High decay';
-}}
-
-function renderDecay(protocols) {{
-  if (decayNormChart) {{ decayNormChart.destroy(); decayNormChart = null; }}
-
-  // decayResults already populated in render() before charts were created
-  const ranked = protocols
-    .filter(p => decayResults[p.name])
-    .map(p => ({{ ...p, decay: decayResults[p.name] }}));
-
-  if (!ranked.length) return;
-
-  // Sort longest half-life first
-  ranked.sort((a, b) => {{
-    const ha = a.decay.halfLife === null ? Infinity : a.decay.halfLife;
-    const hb = b.decay.halfLife === null ? Infinity : b.decay.halfLife;
-    return hb - ha;
-  }});
-
-  document.getElementById('decay-tbody').innerHTML = ranked.map((p, rank) => {{
-    const d   = p.decay;
-    const hl  = d.halfLife;
-    const c   = halfLifeColor(hl);
-    const hlStr = hl === null ? '∞ (growing)' : Math.round(hl) + ' days';
-    return `<tr>
-      <td>#${{rank+1}}</td>
-      <td><strong style="color:${{p.color}}">${{p.name}}</strong></td>
-      <td style="color:${{c}};font-weight:700">${{hlStr}}</td>
-      <td style="font-family:monospace;font-size:.8rem">${{(d.lambda*100).toFixed(3)}}%/day</td>
-      <td style="color:${{c}}">${{halfLifeVerdict(hl)}}</td>
-    </tr>`;
-  }}).join('');
-
-  // Normalized post-DRIP chart
-  const postDates = [...new Set(
-    protocols.flatMap(p => p.series.filter(d => d.date >= CONFIG.end_date).map(d => d.date))
-  )].sort();
-
-  const normDatasets = [];
-  protocols.forEach(p => {{
-    const d = decayResults[p.name];
-    if (!d) return;
-    const tvlMap  = new Map(p.series.map(s => [s.date, s.tvl]));
-    const baseline = p.series.find(s => s.date >= CONFIG.end_date);
-    if (!baseline || !baseline.tvl) return;
-    const base = baseline.tvl;
-
-    normDatasets.push({{
-      label: p.name,
-      data: postDates.map(date => {{
-        const tvl = tvlMap.get(date);
-        return tvl !== undefined ? +(tvl/base*100).toFixed(2) : NaN;
-      }}),
-      borderColor: p.color, backgroundColor: 'transparent',
-      borderWidth: 2, pointRadius: 0, fill: false, tension: 0.3
-    }});
-    normDatasets.push({{
-      label: p.name + ' fit',
-      data: postDates.map(date => {{
-        const v = d.fittedByDate[date];
-        return v !== undefined ? +(v/base*100).toFixed(2) : NaN;
-      }}),
-      borderColor: p.color + '88', backgroundColor: 'transparent',
-      borderWidth: 1.5, borderDash: [5, 3], pointRadius: 0, fill: false, tension: 0
-    }});
-  }});
-
-  decayNormChart = new Chart(document.getElementById('decay-norm-chart'), {{
-      type: 'line',
-      data: {{ labels: postDates, datasets: normDatasets }},
-      options: {{
-        responsive: true, animation: false, maintainAspectRatio: true,
-        interaction: {{ mode: 'index', intersect: false }},
-        plugins: {{
-          legend: {{ display: true, position: 'top',
-            labels: {{ color: '#374151', font: {{size:10}},
-              filter: item => !item.label?.endsWith(' fit') }} }},
-          annotation: {{ annotations: {{
-            baseline: {{ type:'line', yMin:100, yMax:100,
-              borderColor:'#d1d5db', borderWidth:1, borderDash:[3,3] }}
-          }} }},
-          tooltip: {{
-            enabled: true,
-            filter: item => !item.dataset.label.endsWith(' fit'),
-            callbacks: {{ label: ctx => `${{ctx.dataset.label}}: ${{ctx.parsed.y?.toFixed(1)}}%` }}
-          }}
-        }},
-        scales: {{
-          x: {{ ticks:{{color:'#9ca3af',maxTicksLimit:8,font:{{size:10}}}},
-                 grid:{{color:'#f3f4f6',lineWidth:1}} }},
-          y: {{ ticks:{{color:'#9ca3af',callback:v=>v+'%',font:{{size:10}}}},
-                 grid:{{color:'#f3f4f6',lineWidth:1}} }}
-        }}
-      }}
-    }});
-
-  document.getElementById('decay-heading').style.display  = '';
-  document.getElementById('decay-subtitle').style.display = '';
-  document.getElementById('decay-rank-wrap').style.display = '';
-  document.getElementById('decay-norm-wrap').style.display = '';
-}}
 
 // ── cohort retention ─────────────────────────────────────────────────────────
 function renderCohort() {{
@@ -1113,9 +939,6 @@ function openModal(i) {{
   document.getElementById('modal').style.display = 'block'; document.body.style.overflow = 'hidden';
 
   const preColor = retentionColor(m.retentionVsPre);
-  const decay    = decayResults[p.name];
-  const hlColor  = decay ? halfLifeColor(decay.halfLife) : '#64748b';
-  const hlStr    = decay ? (decay.halfLife === null ? '∞' : Math.round(decay.halfLife) + 'd') : '—';
   document.getElementById('modal-stats').innerHTML = `
     <div class="modal-stat">
       <div class="modal-stat-lbl">Current TVL (24h)</div>
@@ -1129,11 +952,6 @@ function openModal(i) {{
       <div class="modal-stat-lbl">Retention vs Pre-Season TVL</div>
       <div class="modal-stat-val" style="color:${{preColor}}">${{pct(m.retentionVsPre)}}</div>
       <div class="modal-stat-sub">current ÷ TVL before DRIP started</div>
-    </div>
-    <div class="modal-stat" style="border-color:${{hlColor}}40">
-      <div class="modal-stat-lbl">TVL Half-Life (post-Season 1)</div>
-      <div class="modal-stat-val" style="color:${{hlColor}}">${{hlStr}}</div>
-      <div class="modal-stat-sub">${{decay ? halfLifeVerdict(decay.halfLife) : 'no data'}}</div>
     </div>
   `;
 
